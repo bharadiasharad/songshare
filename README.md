@@ -135,11 +135,20 @@ curl -b mgr.txt -X POST localhost:3000/songs/SONG_ID/pitches \
 ```bash
 npm run test        # unit tests (mocked, no DB needed)
 npm run test:cov    # with coverage
-npm run test:e2e    # e2e smoke tests (requires a database)
+npm run test:e2e    # jest e2e smoke tests (requires a database)
+
+# Playwright API suite — full flow across all endpoints + auth/validation negatives.
+# Requires a running API; point it at the instance under test.
+npm run test:api                                   # defaults to http://localhost:3001
+API_BASE_URL=http://localhost:3000 npm run test:api
 ```
 
-Unit tests cover service authorization logic and the storage-cleanup-on-failure path; the e2e
-suite verifies auth enforcement and the error envelope.
+- **Unit** tests cover service authorization logic and the storage-cleanup-on-failure path.
+- **jest e2e** verifies auth enforcement and the error-envelope shape.
+- **Playwright** (`e2e/api.spec.ts`, 23 tests) drives the complete journey — sign-up/in,
+  roles, org creation, link-by-email, song upload/list/stream/update, pitch
+  create/get/update, cascade delete — plus negatives (401/403/404/400). It uses per-role
+  request contexts that persist the better-auth session cookie.
 
 ---
 

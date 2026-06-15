@@ -34,4 +34,14 @@ export class OrganizationsRepository {
       where: { organizationId_userId: { organizationId, userId } },
     });
   }
+
+  findMembershipWithUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<(Member & { user: User }) | null> {
+    return this.prisma.member.findUnique({
+      where: { organizationId_userId: { organizationId, userId } },
+      include: { user: true },
+    });
+  }
 }

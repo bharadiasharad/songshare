@@ -58,7 +58,7 @@ export class OrganizationsService {
     organizationId: string,
     email: string,
     headers: IncomingHttpHeaders,
-  ): Promise<Member> {
+  ): Promise<Member & { user: User }> {
     await this.getByIdOrThrow(organizationId);
     const user = await this.usersService.getByEmailOrThrow(email);
 
@@ -74,7 +74,13 @@ export class OrganizationsService {
     if (!result) {
       throw new BadRequestException('Could not add member');
     }
-    return result;
+    // better-auth returns a bare member; re-read with the user relation so the
+    // response includes the linked songwriter's name and email.
+    const member = await this.orgRepository.findMembershipWithUser(organizationId, user.id);
+    if (!member) {
+      throw new BadRequestException('Could not add member');
+    }
+    return member;
   }
 
   private slugify(name: string): string {

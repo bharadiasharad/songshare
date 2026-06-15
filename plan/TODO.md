@@ -43,6 +43,14 @@ Single consolidated checklist. Ticked as completed.
 - [x] Non-member download → 403
 - [x] Seed script (`db:seed`) — runs under ts-node, creates demo data
 
+## Requirement re-review + comprehensive API tests
+- [x] Reviewed requirement.md vs implementation — all Must-Haves + targeted Nice-to-Haves done
+- [x] Ran existing suite: unit 9/9, jest e2e 3/3
+- [x] Playwright API suite (`e2e/api.spec.ts`, 23 tests) — full flow + negatives, all green
+- [x] Fix found by Playwright: link-songwriter response now includes the user's name/email
+      (was null — better-auth `addMember` returns a bare member; we re-read with the user)
+- [x] Build fix: exclude `playwright.config.ts`/`e2e` from Nest build so output stays `dist/main.js`
+
 ## Optional / follow-up
 - [x] On GitHub remote — `origin/main` (github.com/bharadiasharad/songshare) in sync with all commits
 - [ ] Migrate `package.json#prisma` seed config to `prisma.config.ts` — DEFERRED:
