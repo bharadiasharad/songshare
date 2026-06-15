@@ -1,0 +1,308 @@
+// Prisma schema — Song-Sharing Platform
+//
+// NOTE on better-auth models (User, Session, Account, Verification, Organization,
+// Member, Invitation): these mirror what better-auth's Prisma adapter expects. After
+// changing better-auth config/plugins, run `npx @better-auth/cli generate` to reconcile
+// any field differences for your installed better-auth version, then create a migration.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  MANAGER
+  SONGWRITER
+}
+
+enum SongStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+enum SongAssetKind {
+  DEMO
+  STEM
+  MIX
+}
+
+enum CollaboratorRole {
+  WRITER
+  PRODUCER
+  TOPLINE
+}
+
+enum PitchStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+enum PitchTargetStatus {
+  PENDING
+  INTERESTED
+  PASSED
+  CUT
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// better-auth: identity
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  // Domain extension (better-auth additionalField)
+  role          UserRole @default(SONGWRITER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions       Session[]
+  accounts       Account[]
+  memberships    Member[]
+  invitations    Invitation[]       @relation("InvitedBy")
+  uploadedSongs  Song[]             @relation("UploadedSongs")
+  collaborations SongCollaborator[]
+  createdPitches Pitch[]            @relation("CreatedPitches")
+
+  @@map("user")
+}
+
+model Session {
+  id                   String   @id
+  expiresAt            DateTime
+  token                String   @unique
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  activeOrganizationId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// better-auth: organization plugin
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id
+  name      String
+  slug      String?  @unique
+  logo      String?
+  metadata  String?  @db.Text
+  createdAt DateTime @default(now())
+
+  members     Member[]
+  invitations Invitation[]
+  songs       Song[]
+
+  @@map("organization")
+}
+
+model Member {
+  id             String   @id
+  organizationId String
+  userId         String
+  role           String   @default("member")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String   @id
+  organizationId String
+  email          String
+  role           String?
+  status         String   @default("pending")
+  expiresAt      DateTime
+  inviterId      String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User         @relation("InvitedBy", fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("invitation")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Domain
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Song {
+  id             String     @id @default(cuid())
+  title          String
+  primaryArtist  String?
+  durationSec    Int?
+  bpm            Int?
+  musicalKey     String?
+  genre          String?
+  lyrics         String?    @db.Text
+  status         SongStatus @default(DRAFT)
+  organizationId String
+  uploadedById   String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy    User               @relation("UploadedSongs", fields: [uploadedById], references: [id])
+  assets        SongAsset[]
+  collaborators SongCollaborator[]
+  pitches       Pitch[]
+
+  @@index([organizationId, status])
+  @@index([genre])
+  @@index([uploadedById])
+  @@map("song")
+}
+
+model SongAsset {
+  id        String        @id @default(cuid())
+  songId    String
+  storageKey String        @unique
+  mimeType  String
+  sizeBytes Int
+  kind      SongAssetKind @default(DEMO)
+  version   Int           @default(1)
+  createdAt DateTime      @default(now())
+
+  song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@index([songId])
+  @@map("song_asset")
+}
+
+model SongCollaborator {
+  id           String           @id @default(cuid())
+  songId       String
+  userId       String
+  splitPercent Decimal          @db.Decimal(5, 2)
+  roleOnSong   CollaboratorRole @default(WRITER)
+  createdAt    DateTime         @default(now())
+
+  song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([songId, userId])
+  @@index([userId])
+  @@map("song_collaborator")
+}
+
+model Pitch {
+  id          String      @id @default(cuid())
+  songId      String
+  createdById String
+  description String      @db.Text
+  status      PitchStatus @default(DRAFT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  song      Song          @relation(fields: [songId], references: [id], onDelete: Cascade)
+  createdBy User          @relation("CreatedPitches", fields: [createdById], references: [id])
+  tags      PitchTag[]
+  targets   PitchTarget[]
+
+  @@index([songId])
+  @@index([status])
+  @@map("pitch")
+}
+
+model Tag {
+  id      String     @id @default(cuid())
+  name    String     @unique
+  pitches PitchTag[]
+
+  @@map("tag")
+}
+
+model PitchTag {
+  pitchId String
+  tagId   String
+
+  pitch Pitch @relation(fields: [pitchId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([pitchId, tagId])
+  @@index([tagId])
+  @@map("pitch_tag")
+}
+
+model Artist {
+  id       String        @id @default(cuid())
+  name     String        @unique
+  metadata Json?
+  targets  PitchTarget[]
+
+  @@map("artist")
+}
+
+model PitchTarget {
+  id       String            @id @default(cuid())
+  pitchId  String
+  artistId String
+  status   PitchTargetStatus @default(PENDING)
+  note     String?           @db.Text
+  createdAt DateTime         @default(now())
+
+  pitch  Pitch  @relation(fields: [pitchId], references: [id], onDelete: Cascade)
+  artist Artist @relation(fields: [artistId], references: [id])
+
+  @@unique([pitchId, artistId])
+  @@index([artistId])
+  @@map("pitch_target")
+}
