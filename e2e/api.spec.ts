@@ -10,7 +10,7 @@ import { test, expect, request, APIRequestContext } from '@playwright/test';
  * against a persistent database.
  */
 
-const BASE = process.env.API_BASE_URL ?? 'http://localhost:3001';
+const BASE = process.env.API_BASE_URL ?? 'http://localhost:3000';
 const PASSWORD = 'Passw0rd!';
 const RUN = Date.now();
 

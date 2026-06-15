@@ -139,7 +139,7 @@ npm run test:e2e    # jest e2e smoke tests (requires a database)
 
 # Playwright API suite — full flow across all endpoints + auth/validation negatives.
 # Requires a running API; point it at the instance under test.
-npm run test:api                                   # defaults to http://localhost:3001
+npm run test:api                                   # defaults to http://localhost:3000
 API_BASE_URL=http://localhost:3000 npm run test:api
 ```
 

@@ -5,12 +5,12 @@ import { defineConfig } from '@playwright/test';
  *
  * These are pure HTTP/API tests (no browser) that exercise the full request flow
  * against a running instance of the API. Point them at the server with API_BASE_URL
- * (defaults to the local Docker-published port 3001).
+ * (defaults to the local Docker-published port 3000).
  *
- *   npm run test:api                       # against http://localhost:3001
+ *   npm run test:api                       # against http://localhost:3000
  *   API_BASE_URL=http://localhost:3000 npm run test:api
  */
-const baseURL = process.env.API_BASE_URL ?? 'http://localhost:3001';
+const baseURL = process.env.API_BASE_URL ?? 'http://localhost:3000';
 
 export default defineConfig({
   testDir: './e2e',
