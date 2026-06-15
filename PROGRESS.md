@@ -33,8 +33,7 @@ Living checklist for the Song-Sharing Platform backend. Updated as work complete
 
 ### Fixes found during the live run
 - [x] Corrected compiled entrypoint path `dist/src/main.js` → `dist/main.js` (Dockerfile + start:prod)
-- [x] Decoupled host port from container port in compose (`HOST_PORT`), published on 3001
-      locally (host 3000 was taken by another container)
+- [x] Decoupled host port from container port in compose (`HOST_PORT`), published on 3000
 
 ## Phase 4 — Optional
 - [ ] Add GitHub remote and push the branch
