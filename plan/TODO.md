@@ -44,5 +44,7 @@ Single consolidated checklist. Ticked as completed.
 - [x] Seed script (`db:seed`) — runs under ts-node, creates demo data
 
 ## Optional / follow-up
-- [ ] Add GitHub remote and push `feat/boilerplate`
-- [ ] Migrate `package.json#prisma` seed config to `prisma.config.ts` (Prisma 7 readiness)
+- [x] On GitHub remote — `origin/main` (github.com/bharadiasharad/songshare) in sync with all commits
+- [ ] Migrate `package.json#prisma` seed config to `prisma.config.ts` — DEFERRED:
+      cosmetic Prisma-7 deprecation warning only, and adding prisma.config.ts disables
+      Prisma's automatic `.env` loading (would risk local `migrate dev`/`db seed`). Not worth it now.
