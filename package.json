@@ -10,17 +10,16 @@
   },
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"e2e/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
-    "lint": "eslint \"{src,test}/**/*.ts\" --fix",
-    "lint:check": "eslint \"{src,test}/**/*.ts\"",
+    "lint": "eslint \"{src,e2e}/**/*.ts\" --fix",
+    "lint:check": "eslint \"{src,e2e}/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:api": "playwright test",
     "test:api:report": "playwright show-report",
     "prisma:generate": "prisma generate",
@@ -30,7 +29,7 @@
     "db:seed": "prisma db seed"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node src/scripts/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -89,7 +88,10 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.module.ts",
+      "!main.ts",
+      "!scripts/**"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",

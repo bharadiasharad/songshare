@@ -9,8 +9,8 @@ Built with **NestJS · TypeScript · MySQL · Prisma · better-auth · Docker**,
 architecture (controller → service → repository → mapper), SOLID principles, and atomic
 (transactional) writes.
 
-> The full design rationale lives in [`plan/`](plan/). Schema decisions and trade-offs are
-> documented in [`SOLUTION.md`](SOLUTION.md).
+> The full design rationale lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Schema
+> decisions and trade-offs are documented in [`SOLUTION.md`](SOLUTION.md).
 
 ---
 
@@ -57,7 +57,7 @@ Cross-cutting: AuthGuard/RolesGuard/OrgMembershipGuard · global ValidationPipe 
 ```
 
 Modules: `auth`, `users`, `organizations`, `songs`, `pitches`, plus infra `prisma`,
-`storage`, `config`, `common`. See [`plan/01-architecture-patterns.md`](plan/01-architecture-patterns.md).
+`storage`, `config`, `common`. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
@@ -134,21 +134,22 @@ curl -b mgr.txt -X POST localhost:3000/songs/SONG_ID/pitches \
 
 ```bash
 npm run test        # unit tests (mocked, no DB needed)
-npm run test:cov    # with coverage
-npm run test:e2e    # jest e2e smoke tests (requires a database)
+npm run test:cov    # unit tests with coverage
 
-# Playwright API suite — full flow across all endpoints + auth/validation negatives.
-# Requires a running API; point it at the instance under test.
+# Playwright API suite — the full flow across every endpoint + auth/validation negatives.
+# Against a local target it auto-starts the compiled app (a built dist/ + reachable, migrated
+# DB are required) and reuses an already-running instance such as `docker compose up`.
 npm run test:api                                   # defaults to http://localhost:3000
 API_BASE_URL=http://localhost:3000 npm run test:api
+npm run test:api:report                            # open the last HTML report
 ```
 
-- **Unit** tests cover service authorization logic and the storage-cleanup-on-failure path.
-- **jest e2e** verifies auth enforcement and the error-envelope shape.
-- **Playwright** (`e2e/api.spec.ts`, 23 tests) drives the complete journey — sign-up/in,
-  roles, org creation, link-by-email, song upload/list/stream/update, pitch
-  create/get/update, cascade delete — plus negatives (401/403/404/400). It uses per-role
-  request contexts that persist the better-auth session cookie.
+- **Unit** tests (Jest) cover service authorization logic and the storage-cleanup-on-failure path.
+- **End-to-end** ([`e2e/api.spec.ts`](e2e/api.spec.ts), 23 Playwright tests) drives the complete
+  journey against the **real** better-auth stack — sign-up/in, roles, org creation,
+  link-by-email, song upload/list/stream/update, pitch create/get/update, cascade delete — plus
+  negatives (401/403/404/400). Each role gets its own request context that persists the
+  better-auth session cookie.
 
 ---
 
@@ -160,8 +161,9 @@ npm run lint:check  # CI mode (no fixes)
 npm run format      # prettier only
 ```
 
-CI (`.github/workflows/ci.yml`) runs install → generate → lint → build → migrate → unit + e2e
-on every push/PR against a MySQL service container.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs install → generate → lint →
+build → migrate → unit tests → **Playwright API suite** on every push/PR against a MySQL service
+container, so the real end-to-end flow is exercised on every change.
 
 ---
 
@@ -173,6 +175,16 @@ start, `docker-entrypoint.sh` runs `prisma migrate deploy` before launching the 
 database data and uploads. For a real deployment, point `DATABASE_URL` at a managed MySQL,
 set a strong `BETTER_AUTH_SECRET`, restrict `CORS_ORIGIN`, and swap `LocalDiskStorage` for an
 object-storage implementation (the `STORAGE_SERVICE` token makes this a one-line change).
+
+To seed demo data into a container, set `SEED_ON_START=true` (the entrypoint runs the compiled
+seed — no extra tooling needed inside the image).
+
+---
+
+## Contributing
+
+Setup, conventions, and the pre-PR checklist are in [`CONTRIBUTING.md`](CONTRIBUTING.md); the
+design rationale is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 

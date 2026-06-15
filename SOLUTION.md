@@ -5,8 +5,8 @@
 I treated the brief as a small but real product slice rather than a throwaway demo. I started
 by modeling the **complete domain** (the part the brief explicitly grades), then built a thin
 vertical slice of API over it, prioritizing the five Must-Haves plus Swagger and song
-listing/filtering. The detailed design lives in [`plan/`](plan/) (context, architecture,
-data model, API spec, auth, storage, steps, verification, risks).
+listing/filtering. The detailed design lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+(layering, data model, auth/authorization, storage, trade-offs).
 
 Architecture is a NestJS modular monolith with strict layering:
 

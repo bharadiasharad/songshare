@@ -31,8 +31,18 @@ async function bootstrap(): Promise<void> {
   // Security headers. CSP is disabled so the Swagger UI assets at /docs load.
   app.use(helmet({ contentSecurityPolicy: false }));
 
+  // CORS with credentials cannot use a literal `*` Access-Control-Allow-Origin
+  // (browsers reject it), so a `*` config reflects the request origin instead.
+  // Anything else is treated as an explicit allow-list.
+  const corsOrigins = config.get('corsOrigin', { infer: true });
+  const allowAnyOrigin = corsOrigins.includes('*');
+  if (allowAnyOrigin && config.get('nodeEnv', { infer: true }) === 'production') {
+    new Logger('Bootstrap').warn(
+      'CORS_ORIGIN is "*" in production — set an explicit allow-list of trusted origins.',
+    );
+  }
   app.enableCors({
-    origin: config.get('corsOrigin', { infer: true }),
+    origin: allowAnyOrigin ? true : corsOrigins,
     credentials: true,
   });
 

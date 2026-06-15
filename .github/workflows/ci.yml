@@ -28,6 +28,8 @@ jobs:
       DATABASE_URL: mysql://root:rootpassword@127.0.0.1:3306/songshare_test
       BETTER_AUTH_SECRET: ci-test-secret-at-least-32-characters-long
       BETTER_AUTH_URL: http://localhost:3000
+      # Lock CORS/trustedOrigins to the host the Playwright suite presents as Origin.
+      CORS_ORIGIN: http://localhost:3000
       UPLOAD_DIR: ./uploads
       MAX_UPLOAD_BYTES: 26214400
 
@@ -58,5 +60,18 @@ jobs:
       - name: Unit tests
         run: npm run test
 
-      - name: E2E tests
-        run: npm run test:e2e
+      # End-to-end: boot the compiled app (Playwright's webServer) against the MySQL
+      # service and drive the real auth + business flow across every endpoint.
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: API tests (Playwright)
+        run: npm run test:api
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

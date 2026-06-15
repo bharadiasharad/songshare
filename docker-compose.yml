@@ -40,6 +40,19 @@ services:
         condition: service_healthy
     volumes:
       - uploads:/app/uploads
+    healthcheck:
+      # Uses Node's built-in fetch (no curl/wget in the slim image).
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   db_data:

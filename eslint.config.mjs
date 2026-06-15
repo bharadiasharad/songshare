@@ -36,13 +36,15 @@ export default tseslint.config(
     },
   },
   {
-    // Tests rely on mocks and `any`-typed test harness helpers.
-    files: ['**/*.spec.ts', 'test/**/*.ts'],
+    // Tests (Jest unit specs + the Playwright API suite) lean on loosely-typed
+    // helpers and JSON response bodies, so relax the strict type-aware rules there.
+    files: ['**/*.spec.ts', 'e2e/**/*.ts'],
     rules: {
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/require-await': 'off',
     },
   },

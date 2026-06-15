@@ -6,13 +6,17 @@
  * membership and domain rows are written via Prisma. The script is idempotent:
  * re-running it will not duplicate data.
  *
+ * It lives under `src/` so the Nest build compiles it to `dist/scripts/seed.js`,
+ * letting the production container seed with plain `node` (no `ts-node`/dev deps).
+ * Locally it runs via `npm run db:seed` (ts-node).
+ *
  * Demo credentials (password for both): `Passw0rd!`
  *   manager@example.com    (MANAGER)
  *   songwriter@example.com (SONGWRITER)
  */
 import { randomUUID } from 'node:crypto';
 import { PrismaClient, UserRole } from '@prisma/client';
-import { auth } from '../src/auth/auth';
+import { auth } from '../auth/auth';
 
 const prisma = new PrismaClient();
 
@@ -60,9 +64,7 @@ async function main() {
   // 3. Reference data: tags + target artists
   const tagNames = ['pop', 'summer', 'uptempo'];
   const tags = await Promise.all(
-    tagNames.map((name) =>
-      prisma.tag.upsert({ where: { name }, update: {}, create: { name } }),
-    ),
+    tagNames.map((name) => prisma.tag.upsert({ where: { name }, update: {}, create: { name } })),
   );
 
   const artistNames = ['Dua Lipa', 'The Weeknd'];
@@ -129,7 +131,7 @@ async function main() {
   console.log('   Songwriter: songwriter@example.com / Passw0rd!');
 }
 
-main()
+void main()
   .catch((e) => {
     console.error('❌ Seed failed:', e);
     process.exitCode = 1;

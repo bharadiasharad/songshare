@@ -2,8 +2,9 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { PrismaClient } from '@prisma/client';
 
 /**
- * Single shared PrismaClient for the whole app. Connects on module init and
- * disconnects on shutdown. This is the only class that instantiates PrismaClient.
+ * Single shared PrismaClient for the application's DI graph: every repository
+ * injects this one instance. Connects on module init and disconnects on shutdown.
+ * (better-auth manages its own separate client — see src/auth/auth.ts.)
  */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
