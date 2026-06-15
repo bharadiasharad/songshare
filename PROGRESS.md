@@ -22,10 +22,23 @@ Living checklist for the Song-Sharing Platform backend. Updated as work complete
 - [x] Cap upload size at the multer layer + map MulterError → 413 in the exception filter
 - [x] Re-run build + lint + tests — all green (build ✅, lint 0 problems, 9/9 tests)
 
-## Phase 3 — Next steps
+## Phase 3 — Run & verify in Docker ✅
 - [x] Commit boilerplate + plan as structured commits (branch `feat/boilerplate`)
-- [ ] (Optional) Add GitHub remote to enable cloud workflows / push the branch
-- [ ] Run end-to-end smoke flow against a live container (`docker-compose up`)
+- [x] Build + run full stack via `docker-compose` (app + mysql, migrations applied)
+- [x] End-to-end happy path verified: signup/signin, role, org, link-by-email, song
+      upload (transactional), list/filter, file stream, atomic pitch create, get pitch
+- [x] Negative tests verified: 403 (role), 401 (no session), 404 (unknown email),
+      400 (bad mime + validation) — all return the uniform error envelope
+- [x] Swagger `/docs` renders (14 route groups)
+
+### Fixes found during the live run
+- [x] Corrected compiled entrypoint path `dist/src/main.js` → `dist/main.js` (Dockerfile + start:prod)
+- [x] Decoupled host port from container port in compose (`HOST_PORT`), published on 3001
+      locally (host 3000 was taken by another container)
+
+## Phase 4 — Optional
+- [ ] Add GitHub remote and push the branch
+- [ ] Migrate `package.json#prisma` seed config to `prisma.config.ts` (Prisma 7 readiness)
 
 ## Known limitations / future work
 - better-auth uses its own PrismaClient (separate pool from PrismaService) — acceptable for a

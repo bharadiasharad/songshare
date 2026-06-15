@@ -30,8 +30,11 @@ services:
       # Override host so the app reaches the mysql service inside the compose network
       DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-rootpassword}@mysql:3306/${MYSQL_DATABASE:-songshare}
       UPLOAD_DIR: /app/uploads
+      # App always listens on 3000 inside the container; HOST_PORT controls the
+      # published port so it can be remapped if 3000 is taken on the host.
+      PORT: 3000
     ports:
-      - '${PORT:-3000}:3000'
+      - '${HOST_PORT:-3000}:3000'
     depends_on:
       mysql:
         condition: service_healthy
