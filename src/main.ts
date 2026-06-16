@@ -11,6 +11,7 @@ import { AppModule } from './app.module';
 import { AppConfig } from './config/configuration';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { buildAuthApiPaths } from './auth/auth.swagger';
 
 async function bootstrap(): Promise<void> {
   // Disable the global body parser so we can skip it for the better-auth handler,
@@ -63,9 +64,13 @@ async function bootstrap(): Promise<void> {
     .setTitle('Song-Sharing Platform API')
     .setDescription('Backend API connecting songwriter managers with their songwriters')
     .setVersion('1.0')
+    .addTag('auth', 'Registration, login and session (handled by better-auth at /api/auth/*)')
     .addCookieAuth('better-auth.session_token')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
+  // The better-auth routes are a catch-all handler Swagger can't introspect, so
+  // document their contract explicitly (see auth.swagger.ts) and merge it in.
+  document.paths = { ...buildAuthApiPaths(), ...document.paths };
   SwaggerModule.setup('docs', app, document);
 
   const port = config.get('port', { infer: true });
