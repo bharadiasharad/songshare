@@ -15,13 +15,30 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiPayloadTooLargeResponse,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthUser } from '../auth/auth-user.interface';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ApiAuth } from '../common/decorators/api-auth.decorator';
+import { ApiPaginatedResponse } from '../common/decorators/api-paginated-response.decorator';
+import { ErrorResponse } from '../common/dto/error-response.dto';
 import { PaginatedResult } from '../common/dto/paginated';
 import { FileValidationPipe } from '../storage/pipes/file-validation.pipe';
 import { SongsService } from './songs.service';
@@ -31,6 +48,7 @@ import { QuerySongsDto } from './dto/query-songs.dto';
 import { SongResponse, toSongResponse } from './songs.mapper';
 
 @ApiTags('songs')
+@ApiAuth()
 @Controller('songs')
 export class SongsController {
   constructor(private readonly songsService: SongsService) {}
@@ -50,7 +68,7 @@ export class SongsController {
       type: 'object',
       required: ['file', 'organizationId', 'title'],
       properties: {
-        file: { type: 'string', format: 'binary' },
+        file: { type: 'string', format: 'binary', description: 'Audio file (mp3/wav/m4a/aac/ogg)' },
         organizationId: { type: 'string' },
         title: { type: 'string' },
         primaryArtist: { type: 'string' },
@@ -62,6 +80,13 @@ export class SongsController {
       },
     },
   })
+  @ApiCreatedResponse({ description: 'Song created with its asset', type: SongResponse })
+  @ApiBadRequestResponse({ description: 'Missing/invalid file or fields', type: ErrorResponse })
+  @ApiForbiddenResponse({
+    description: 'Caller is not a SONGWRITER, or not a member of the org',
+    type: ErrorResponse,
+  })
+  @ApiPayloadTooLargeResponse({ description: 'File exceeds MAX_UPLOAD_BYTES', type: ErrorResponse })
   async upload(
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateSongDto,
@@ -72,6 +97,7 @@ export class SongsController {
 
   @Get()
   @ApiOperation({ summary: 'List/filter songs within the user’s organizations' })
+  @ApiPaginatedResponse(SongResponse)
   async list(
     @CurrentUser() user: AuthUser,
     @Query() query: QuerySongsDto,
@@ -82,12 +108,30 @@ export class SongsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a song by id (org members only)' })
+  @ApiParam({ name: 'id', description: 'Song id' })
+  @ApiOkResponse({ description: 'The requested song', type: SongResponse })
+  @ApiForbiddenResponse({
+    description: 'Caller is not a member of the song’s org',
+    type: ErrorResponse,
+  })
+  @ApiNotFoundResponse({ description: 'Song not found', type: ErrorResponse })
   async getById(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<SongResponse> {
     return toSongResponse(await this.songsService.getAuthorized(user, id));
   }
 
   @Get(':id/file')
   @ApiOperation({ summary: 'Stream/download the song audio (org members only)' })
+  @ApiParam({ name: 'id', description: 'Song id' })
+  @ApiProduces('audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/aac', 'audio/ogg')
+  @ApiOkResponse({
+    description: 'Binary audio stream (Content-Disposition: attachment)',
+    content: { 'audio/*': { schema: { type: 'string', format: 'binary' } } },
+  })
+  @ApiForbiddenResponse({
+    description: 'Caller is not a member of the song’s org',
+    type: ErrorResponse,
+  })
+  @ApiNotFoundResponse({ description: 'Song or audio file not found', type: ErrorResponse })
   async download(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -103,6 +147,11 @@ export class SongsController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update song metadata/status (uploader or org manager)' })
+  @ApiParam({ name: 'id', description: 'Song id' })
+  @ApiOkResponse({ description: 'The updated song', type: SongResponse })
+  @ApiBadRequestResponse({ description: 'Validation failed', type: ErrorResponse })
+  @ApiForbiddenResponse({ description: 'Caller may not modify this song', type: ErrorResponse })
+  @ApiNotFoundResponse({ description: 'Song not found', type: ErrorResponse })
   async update(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -114,6 +163,10 @@ export class SongsController {
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete a song and its files (uploader or org manager)' })
+  @ApiParam({ name: 'id', description: 'Song id' })
+  @ApiNoContentResponse({ description: 'Song deleted (cascades to assets/pitches)' })
+  @ApiForbiddenResponse({ description: 'Caller may not delete this song', type: ErrorResponse })
+  @ApiNotFoundResponse({ description: 'Song not found', type: ErrorResponse })
   async remove(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<void> {
     await this.songsService.remove(user, id);
   }
