@@ -78,6 +78,7 @@ async function uploadSong(
   songwriter: APIRequestContext,
   orgId: string,
   title: string,
+  fields: { genre?: string; primaryArtist?: string } = {},
 ): Promise<string> {
   const res = await songwriter.post('/songs', {
     multipart: {
@@ -88,12 +89,19 @@ async function uploadSong(
       },
       organizationId: orgId,
       title,
-      genre: 'pop',
+      genre: fields.genre ?? 'pop',
       durationSec: '200',
+      ...(fields.primaryArtist ? { primaryArtist: fields.primaryArtist } : {}),
     },
   });
   expect(res.status(), 'upload song').toBe(201);
   return (await res.json()).id as string;
+}
+
+/** Resolve a member's user id from an organization's member list (by email). */
+async function memberId(manager: APIRequestContext, orgId: string, email: string): Promise<string> {
+  const members = await (await manager.get(`/organizations/${orgId}/members`)).json();
+  return members.find((m: { email: string; userId: string }) => m.email === email).userId as string;
 }
 
 /** Manager creates a pitch (tags + target artists) for a song; returns its id. */
@@ -478,6 +486,211 @@ test.describe('Song-sharing platform — end-to-end flows', () => {
       const res = await anon.get('/health/ready');
       expect(res.status()).toBe(200);
       expect((await res.json()).database).toBe('up');
+    });
+  });
+
+  // ── Flow 11 (complex) ───────────────────────────────────────────────────────
+  test('A songwriter on two competing labels keeps each label’s catalogue isolated', async () => {
+    let writer: Actor;
+    let labelA: Actor;
+    let labelB: Actor;
+    let orgA: string;
+    let orgB: string;
+    let songA: string;
+    let songB: string;
+
+    await test.step('Given a songwriter linked to two different managers’ organizations', async () => {
+      writer = await register('Tessa Twolabels');
+      labelA = await register('Anna A&R', 'MANAGER');
+      labelB = await register('Bruno Booker', 'MANAGER');
+      orgA = await createOrganization(labelA.ctx, `Label A ${RUN}`);
+      orgB = await createOrganization(labelB.ctx, `Label B ${RUN}`);
+      await linkSongwriter(labelA.ctx, orgA, writer.email);
+      await linkSongwriter(labelB.ctx, orgB, writer.email);
+    });
+
+    await test.step('When the songwriter uploads a distinct song to each label', async () => {
+      songA = await uploadSong(writer.ctx, orgA, 'Song for A');
+      songB = await uploadSong(writer.ctx, orgB, 'Song for B');
+    });
+
+    await test.step('Then the songwriter sees both songs across their organizations', async () => {
+      const ids = (await (await writer.ctx.get('/songs?limit=100')).json()).data.map(
+        (s: { id: string }) => s.id,
+      );
+      expect(ids).toEqual(expect.arrayContaining([songA, songB]));
+    });
+
+    await test.step('But label A sees only its own song, never label B’s', async () => {
+      const ids = (await (await labelA.ctx.get('/songs?limit=100')).json()).data.map(
+        (s: { id: string }) => s.id,
+      );
+      expect(ids).toContain(songA);
+      expect(ids).not.toContain(songB);
+    });
+
+    await test.step('And label A cannot fetch label B’s song or list label B’s catalogue', async () => {
+      expect((await labelA.ctx.get(`/songs/${songB}`)).status()).toBe(403);
+      // Requesting another org's catalogue is scoped to membership → an empty page.
+      const scoped = await (await labelA.ctx.get(`/songs?organizationId=${orgB}`)).json();
+      expect(scoped.data).toHaveLength(0);
+    });
+  });
+
+  // ── Flow 12 (complex) ───────────────────────────────────────────────────────
+  test('Editing a song is limited to its uploader or a manager of its organization', async () => {
+    let manager: Actor;
+    let uploader: Actor;
+    let otherWriter: Actor;
+    let orgId: string;
+    let songId: string;
+
+    await test.step('Given an org with a manager and two member songwriters, one of whom uploaded a song', async () => {
+      manager = await register('Maya Manager', 'MANAGER');
+      uploader = await register('Ulla Uploader');
+      otherWriter = await register('Otto Other');
+      orgId = await createOrganization(manager.ctx, `Studio ${RUN}`);
+      await linkSongwriter(manager.ctx, orgId, uploader.email);
+      await linkSongwriter(manager.ctx, orgId, otherWriter.email);
+      songId = await uploadSong(uploader.ctx, orgId, 'Shared Studio Demo');
+    });
+
+    await test.step('When a different member songwriter tries to edit it, Then it is forbidden (403)', async () => {
+      const res = await otherWriter.ctx.patch(`/songs/${songId}`, { data: { status: 'READY' } });
+      expect(res.status()).toBe(403);
+    });
+
+    await test.step('When the org manager (not the uploader) edits it, Then it succeeds', async () => {
+      const res = await manager.ctx.patch(`/songs/${songId}`, {
+        data: { status: 'READY', bpm: 96 },
+      });
+      expect(res.status()).toBe(200);
+      expect(await res.json()).toMatchObject({ status: 'READY', bpm: 96 });
+    });
+
+    await test.step('And the org manager can delete it', async () => {
+      expect((await manager.ctx.delete(`/songs/${songId}`)).status()).toBe(204);
+      expect((await manager.ctx.get(`/songs/${songId}`)).status()).toBe(404);
+    });
+  });
+
+  // ── Flow 13 (complex) ───────────────────────────────────────────────────────
+  test('Co-managers can each pitch a song, and a manager may revise a peer’s pitch', async () => {
+    let lead: Actor;
+    let peer: Actor;
+    let writer: Actor;
+    let orgId: string;
+    let songId: string;
+    let leadPitch: string;
+    let peerPitch: string;
+
+    await test.step('Given an organization with two managers and a song', async () => {
+      lead = await register('Lena Lead', 'MANAGER');
+      peer = await register('Pedro Peer', 'MANAGER');
+      writer = await register('Cory Cowriter');
+      orgId = await createOrganization(lead.ctx, `A&R Team ${RUN}`);
+      await linkSongwriter(lead.ctx, orgId, peer.email); // a second manager joins as a member
+      await linkSongwriter(lead.ctx, orgId, writer.email);
+      songId = await uploadSong(writer.ctx, orgId, 'Team Pick');
+    });
+
+    await test.step('When each manager creates their own pitch for the song', async () => {
+      leadPitch = await createPitch(lead.ctx, songId);
+      peerPitch = await createPitch(peer.ctx, songId);
+      expect(leadPitch).not.toBe(peerPitch);
+    });
+
+    await test.step('Then both pitches are listed for the song', async () => {
+      const ids = (await (await lead.ctx.get(`/pitches?songId=${songId}`)).json()).data.map(
+        (p: { id: string }) => p.id,
+      );
+      expect(ids).toEqual(expect.arrayContaining([leadPitch, peerPitch]));
+    });
+
+    await test.step('And the lead manager can revise the peer’s pitch and advance a target', async () => {
+      const res = await lead.ctx.patch(`/pitches/${peerPitch}`, {
+        data: {
+          status: 'ACCEPTED',
+          targetArtists: [{ name: `Sofia ${RUN}`, status: 'INTERESTED' }],
+        },
+      });
+      expect(res.status()).toBe(200);
+      const pitch = await res.json();
+      expect(pitch.status).toBe('ACCEPTED');
+      expect(pitch.targets[0]).toMatchObject({ status: 'INTERESTED' });
+    });
+  });
+
+  // ── Flow 14 (complex) ───────────────────────────────────────────────────────
+  test('Reviewing a large catalogue with pagination and filters returns consistent results', async () => {
+    const POP = 4;
+    const ROCK = 3;
+    const needle = `Needle${RUN}`;
+    let manager: Actor;
+    let popWriter: Actor;
+    let rockWriter: Actor;
+    let orgId: string;
+
+    await test.step('Given an org whose two songwriters uploaded a mixed-genre catalogue', async () => {
+      manager = await register('Cara Catalogue', 'MANAGER');
+      popWriter = await register('Percy Pop');
+      rockWriter = await register('Rita Rock');
+      orgId = await createOrganization(manager.ctx, `Catalogue ${RUN}`);
+      await linkSongwriter(manager.ctx, orgId, popWriter.email);
+      await linkSongwriter(manager.ctx, orgId, rockWriter.email);
+      for (let i = 0; i < POP; i++) {
+        // one pop song carries a unique search needle in its title
+        await uploadSong(popWriter.ctx, orgId, i === 0 ? `${needle} Anthem` : `Pop ${i}`, {
+          genre: 'pop',
+        });
+      }
+      for (let i = 0; i < ROCK; i++) {
+        await uploadSong(rockWriter.ctx, orgId, `Rock ${i}`, { genre: 'rock' });
+      }
+    });
+
+    await test.step('When the manager pages through the catalogue (limit 3)', async () => {
+      const seen = new Set<string>();
+      let total = 0;
+      let totalPages = 0;
+      for (let page = 1; page <= 3; page++) {
+        const body = await (
+          await manager.ctx.get(`/songs?organizationId=${orgId}&page=${page}&limit=3`)
+        ).json();
+        total = body.meta.total;
+        totalPages = body.meta.totalPages;
+        body.data.forEach((s: { id: string }) => seen.add(s.id));
+      }
+      // Every song is seen exactly once across the pages, with correct metadata.
+      expect(total).toBe(POP + ROCK);
+      expect(totalPages).toBe(Math.ceil((POP + ROCK) / 3));
+      expect(seen.size).toBe(POP + ROCK);
+    });
+
+    await test.step('Then filtering by genre returns only that genre', async () => {
+      const rock = await (
+        await manager.ctx.get(`/songs?organizationId=${orgId}&genre=rock&limit=100`)
+      ).json();
+      expect(rock.data).toHaveLength(ROCK);
+      expect(rock.data.every((s: { genre: string }) => s.genre === 'rock')).toBeTruthy();
+    });
+
+    await test.step('And filtering by songwriter returns only that writer’s uploads', async () => {
+      const popWriterId = await memberId(manager.ctx, orgId, popWriter.email);
+      const mine = await (
+        await manager.ctx.get(
+          `/songs?organizationId=${orgId}&songwriterId=${popWriterId}&limit=100`,
+        )
+      ).json();
+      expect(mine.data).toHaveLength(POP);
+    });
+
+    await test.step('And a full-text search matches the unique title', async () => {
+      const found = await (
+        await manager.ctx.get(`/songs?organizationId=${orgId}&q=${needle}`)
+      ).json();
+      expect(found.data).toHaveLength(1);
+      expect(found.data[0].title).toContain(needle);
     });
   });
 });
