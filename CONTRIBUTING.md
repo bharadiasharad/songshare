@@ -74,12 +74,17 @@ Follow the patterns already in the tree (see [`docs/ARCHITECTURE.md`](docs/ARCHI
 ```bash
 npm run test            # Jest unit tests (fast, mocked, no DB)
 npm run test:api        # Playwright end-to-end suite (needs a running, migrated API)
+npm run test:api:report # open the HTML report (each call's request + response is attached)
 ```
 
 - Add **unit tests** for new service logic (authorization branches, error paths) — mock the
   repository and storage layers as the existing specs do.
-- Extend the **Playwright suite** ([`e2e/api.spec.ts`](e2e/api.spec.ts)) for new endpoints,
-  including the relevant negative cases (401/403/404/400).
+- Extend the **Playwright suite** ([`e2e/api.spec.ts`](e2e/api.spec.ts)) by adding a new
+  **flow** — a `test` written as `Given/When/Then` `test.step()`s describing a complete user
+  journey, including the relevant negative cases (401/403/404/400). Build actors/data with the
+  existing helpers (`register`, `createOrganization`, `uploadSong`, …) and create contexts via
+  `newLoggedContext()` so every request/response is captured in the report
+  ([`e2e/api-logging.ts`](e2e/api-logging.ts)).
 
 ## Before you open a PR
 

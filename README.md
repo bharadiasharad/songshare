@@ -81,12 +81,14 @@ Env is validated at boot (Joi) — the app fails fast on missing/invalid values.
 ## API overview
 
 Auth is cookie-based (better-auth). All non-auth routes require a session; roles are enforced
-per endpoint. Full interactive docs at `/docs`.
+per endpoint. Full interactive docs at `/docs` — every endpoint documents its request body,
+response and error schemas (the uniform error envelope), query/path params, and cookie-auth
+requirement, including the better-auth routes.
 
 | Area | Endpoint | Notes |
 |---|---|---|
 | Health | `GET /health` · `GET /health/ready` | liveness + DB readiness (public) |
-| Auth | `POST /api/auth/sign-up/email` · `POST /api/auth/sign-in/email` · `POST /api/auth/sign-out` | handled by better-auth |
+| Auth | `POST /api/auth/sign-up/email` · `POST /api/auth/sign-in/email` · `POST /api/auth/sign-out` · `GET /api/auth/get-session` | handled by better-auth |
 | Users | `GET /users/me` · `PATCH /users/me` · `GET /users/:id` | profile + role |
 | Orgs | `POST /organizations` (manager) · `GET /organizations` · `GET /organizations/:id` · `GET /organizations/:id/members` | |
 | Orgs | `POST /organizations/:id/songwriters` (manager) | link **by email** |
@@ -145,11 +147,15 @@ npm run test:api:report                            # open the last HTML report
 ```
 
 - **Unit** tests (Jest) cover service authorization logic and the storage-cleanup-on-failure path.
-- **End-to-end** ([`e2e/api.spec.ts`](e2e/api.spec.ts), 23 Playwright tests) drives the complete
-  journey against the **real** better-auth stack — sign-up/in, roles, org creation,
-  link-by-email, song upload/list/stream/update, pitch create/get/update, cascade delete — plus
-  negatives (401/403/404/400). Each role gets its own request context that persists the
-  better-auth session cookie.
+- **End-to-end** ([`e2e/api.spec.ts`](e2e/api.spec.ts)) is **14 BDD flows** against the **real**
+  better-auth stack — each a self-contained user journey written as `Given/When/Then` steps:
+  manager onboarding, link-by-email + song upload/list/stream, pitch create/get/list/update,
+  song update + cascade delete, **multi-org data isolation**, the **song-edit authorization
+  matrix**, **co-manager pitching**, and **pagination/filtering at scale** — plus negatives
+  (401/403/404/400). Each actor gets its own request context that persists the session cookie.
+- **Request/response in the report:** every call is attached to the HTML report (method, URL,
+  headers, body ↔ status, headers, body) with `Cookie`/`Set-Cookie`/`Authorization` masked and
+  binary bodies summarised. Open it with `npm run test:api:report`.
 
 ---
 

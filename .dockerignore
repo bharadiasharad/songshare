@@ -11,5 +11,17 @@ uploads
 Dockerfile
 docker-compose.yml
 .dockerignore
+
+# Tests & reports are never part of the runtime image
+e2e
+playwright.config.ts
+playwright-report
+test-results
+blob-report
+
+# Docs / planning
 README.md
+CONTRIBUTING.md
+SOLUTION.md
+docs
 plan

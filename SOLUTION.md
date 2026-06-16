@@ -61,8 +61,9 @@ which writes need transactions — those are version- and domain-specific.
 - Cursor-based pagination and full-text search on songs.
 - S3 storage strategy + signed URLs + background audio metadata extraction.
 - Pitch sharing/notifications and an audit log; richer `PitchTarget` workflow endpoints.
-- Broader automated test coverage (the authorization matrix, transaction rollbacks) and request
-  rate limiting.
+- Request rate limiting, and remaining test coverage (transaction-rollback paths) on top of the
+  current Jest unit tests and the 14 Playwright BDD flows — which already cover the authorization
+  matrix, multi-org isolation and pagination at scale.
 
 ## Challenges
 

@@ -157,7 +157,27 @@ authoritative.
 
 ---
 
-## 6. Trade-offs & future work
+## 6. Testing
+
+Two layers, both run in CI:
+
+- **Unit tests (Jest)** isolate business logic by mocking the repository and storage layers —
+  e.g. the song-upload storage-cleanup-on-failure path and the pitch/song authorization branches.
+- **End-to-end (Playwright)** drives the real HTTP API (and the real better-auth stack) as **BDD
+  flows** — each `test` is a complete user journey expressed in `Given/When/Then` steps, covering
+  onboarding, upload, pitching, the cascade lifecycle, multi-org isolation, the authorization
+  matrix, co-manager pitching, and pagination/filtering at scale, plus the 401/403/404/400
+  negatives. Flows are self-contained (each provisions its own uniquely-suffixed actors/data), so
+  they are independent and repeatable against a persistent database.
+
+Every API call is attached to the HTML report (request + response, with `Cookie`/`Set-Cookie`/
+`Authorization` masked) via a small `APIRequestContext` proxy, making the report a living,
+shareable record of the API's behaviour. CI boots the compiled app against a MySQL service and
+runs the suite on every push/PR.
+
+---
+
+## 7. Trade-offs & future work
 
 **Prioritized:** a complete, well-indexed schema; clean layering; transactional integrity; a
 working one-command startup; Swagger + filtering; and an end-to-end test suite — the things this
