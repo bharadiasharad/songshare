@@ -67,9 +67,15 @@ which writes need transactions — those are version- and domain-specific.
 
 ## Challenges
 
-The most interesting problem was integrating **better-auth (framework-agnostic) into NestJS**:
-its handler needs the raw request, so the global body parser is disabled and re-applied to all
-routes except `/api/auth/*`, and the `AuthGuard` validates sessions via
-`auth.api.getSession(fromNodeHeaders(...))`. The second was deciding the **transaction
-boundaries** — keeping org/member operations inside better-auth's own atomic API while wrapping
-domain composite writes in `prisma.$transaction`, and cleaning up uploaded files on rollback.
+- **The same `DATABASE_URL` doesn't work everywhere.** Inside `docker-compose` the database host
+  is the `mysql` service name; for local development it's `127.0.0.1`. Making "clone → copy
+  `.env` → run" smooth in both modes meant calling this out explicitly in `.env.example` and the
+  README so the first run doesn't fail on a connection error.
+- **Cookie-based auth is fiddly to wire.** The session cookie only round-trips when CORS is set up
+  with `credentials` and the request's `Origin` is allow-listed, and better-auth needs the *raw*
+  request body — so the global JSON parser is disabled and re-applied to every route except
+  `/api/auth/*`. Getting sign-in to reliably set and return the session was the trickiest part.
+- **Keeping multi-step writes consistent.** Deciding which operations need a transaction: wrapping
+  the composite domain writes (song + asset, pitch + tags + targets) in `prisma.$transaction`,
+  leaving org/member operations to better-auth's own atomic API, and deleting an uploaded file if
+  the DB write fails so no orphans are left behind.
